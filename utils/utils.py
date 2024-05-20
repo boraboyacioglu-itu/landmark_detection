@@ -3,7 +3,11 @@ from typing import List, Tuple
 import cv2
 import mediapipe as mp
 import numpy as np
-    
+
+from plotly import graph_objects as go
+from scipy.spatial import procrustes
+from scipy.linalg import orthogonal_procrustes
+
 def preprocess(image, target_size) -> np.ndarray:
     """ Preprocess an image. """
     
@@ -40,6 +44,20 @@ def extract_landmarks(detector, image) -> np.ndarray:
         lm = np.zeros((478, 3))
     
     return lm
+
+def stabilized_lm(lm: np.ndarray, N: int) -> np.ndarray:
+    """ Stabilized landmarks. """
+    
+    # Std dev of x, y, z coordinates for each landmark.
+    lm_var = np.std(lm, axis=0)
+
+    # Total variability of each landmark.
+    total_var = np.sum(lm_var, axis=1)
+
+    # Indexes of the most stable landmarks.
+    lm_stable = np.argsort(total_var)[:N]
+    
+    return lm_stable
 
 def train_test_split(X1: List[np.ndarray], X2: List[np.ndarray], y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """ Split the data into train and test sets. """
@@ -104,3 +122,76 @@ def train_test_split(X1: List[np.ndarray], X2: List[np.ndarray], y: np.ndarray) 
             continue
         
     return X1_train, X1_test, X2_train, X2_test, y_train, y_test
+
+def realign_lm(lm: np.ndarray, lm_stable: np.ndarray, ref: int = 0) -> np.ndarray:
+    """ Realign the landmarks. """
+    
+    # Extract the stable landmarks.
+    ref_points = lm[ref, lm_stable]
+    face_points = lm[:, lm_stable]
+    
+    # Define the align function.
+    def align(ref_points, face_points, point):
+        # Create the aligned points.
+        aligned_points_s = procrustes(ref_points, face_points)[1]
+        
+        # Calculate the rotation and scale.
+        R, scale = orthogonal_procrustes(face_points, aligned_points_s)
+        
+        # Do the alignment transformations.
+        point -= np.mean(face_points, axis=0)
+        point = point @ R.T * scale
+        point += np.mean(ref_points, axis=0)
+        return point
+        
+    # Align the faces.
+    aligned_lm = [
+        align(ref_points, face_points[i], point)
+        if np.any(point)
+        else point
+        for i, point in enumerate(lm)
+    ]
+    
+    return np.array(aligned_lm)
+
+def plot_lm(lm: np.ndarray, stable_indices=None) -> None:
+    """ Plot the landmarks. """
+    
+    # Initialise the colors.
+    colors = np.array(lm[:, 2], copy=True)
+    colorscale = 'Viridis'
+    
+    # Change the colours based on the stable indices.
+    if stable_indices is not None:
+        # Change all the colours to 0.
+        colors[:] = 0
+        
+        # Change the colours of the stable landmarks to 1.
+        colors[stable_indices] = 1
+        
+        # Change the colorscale.
+        colorscale = [[0, 'black'], [1, 'red']]
+    
+    # Create a scatter plot of the 3D points.
+    fig = go.Figure(data=[go.Scatter3d(
+        x=lm[:, 0],
+        y=lm[:, 1],
+        z=lm[:, 2],
+        mode='markers',
+        marker=dict(size=2, color=colors, colorscale=colorscale, opacity=0.8)
+    )])
+
+    # Update the layout.
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z'
+        ),
+        width=800,
+        height=800,
+        margin={'l': 10, 'r': 10, 'b': 10, 't': 10}
+    )
+
+    # Show the plot.
+    fig.show()
