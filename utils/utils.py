@@ -1,0 +1,106 @@
+from typing import List, Tuple
+
+import cv2
+import mediapipe as mp
+import numpy as np
+    
+def preprocess(image, target_size) -> np.ndarray:
+    """ Preprocess an image. """
+    
+    # Convert to RGB.
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Resize the image.
+    image = cv2.resize(image, target_size)
+    
+    return image
+
+def extract_landmarks(detector, image) -> np.ndarray:
+    """ Extract and normalize the landmarks from the image. """
+    
+    # Convert the image to MediaPipe image.
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
+        
+    # Detect the landmarks.
+    face_landmarks = detector.detect(mp_image).face_landmarks
+    
+    # Define the the landmark extractor.
+    coords = lambda lm: [lm.x, lm.y, lm.z]
+    
+    if face_landmarks and len(face_landmarks) != 468:
+        face_landmarks = face_landmarks[0]
+            
+    # Extract the landmarks.
+    lm = [
+        coords(normalized_landmark)
+        for normalized_landmark in face_landmarks
+    ]
+    
+    if len(lm) != 478:
+        lm = np.zeros((478, 3))
+    
+    return lm
+
+def train_test_split(X1: List[np.ndarray], X2: List[np.ndarray], y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """ Split the data into train and test sets. """
+    
+    # Initialize the train and test sets.
+    X1_train, X1_test, X2_train, X2_test, y_train, y_test = [], [], [], [], [], []
+    
+    # Initialize the ranges.
+    ranges = range(len(X1))
+    
+    # Indexes with only 1 photo.
+    C0_ind = [i for i, vals in enumerate(X1) if len(vals) == 1]
+    
+    # Indexes with more than 1 and less than 6 photos.
+    C1_ind = [i for i, vals in enumerate(X1) if len(vals) < 6 and i not in C0_ind]
+    
+    # Indexes with at least 6 photos.
+    C2_ind = [i for i, vals in enumerate(X1) if len(vals) >= 6]
+    
+    for i in ranges:
+        # If the index is in C0,
+        # append the values to the train set.
+        if i in C0_ind:
+            X1_train.append(X1[i])
+            X2_train.append(X2[i])
+            y_train.append(y[i])
+            
+            continue
+        
+        # If the index is in C1,
+        # append all values except the last one to the train set,
+        # and the last value to the test set.
+        if i in C1_ind:
+            # Train set.
+            X1_train.extend(X1[i][:-1])
+            X2_train.extend(X2[i][:-1])
+            y_train.extend([y[i]] * (len(X1[i]) - 1))
+            
+            # Test set.
+            X1_test.append(X1[i][-1])
+            X2_test.append(X2[i][-1])
+            y_test.append(y[i])
+            
+            continue
+        
+        # If the index is in C2,
+        # append 2/3 of the values to the train set,
+        # and 1/3 of the values to the test set.
+        if i in C2_ind:
+            split = 2 * len(X1[i]) // 3
+            
+            # Train set.
+            X1_train.extend(X1[i][:split])
+            X2_train.extend(X2[i][:split])
+            y_train.extend([y[i]] * split)
+            
+            # Test set.
+            X1_test.extend(X1[i][split:])
+            X2_test.extend(X2[i][split:])
+            y_test.extend([y[i]] * (len(X1[i]) - split))
+            
+            continue
+        
+    return X1_train, X1_test, X2_train, X2_test, y_train, y_test

@@ -1,0 +1,5 @@
+
+.DS_Store
+new_data/
+landmarks/
+shape_predictor_68_face_landmarks.dat
