@@ -18,6 +18,9 @@ class FaceDataset(Dataset):
         self.landmarks = np.load(landmarks_path).astype(np.float32)
         self.labels = np.load(labels_path)
         self.transform = transform
+    
+    def size(self):
+        return self.images.shape[1]
 
     def __len__(self):
         return len(self.labels)
