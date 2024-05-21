@@ -1,3 +1,8 @@
+# Authors: Melisa Mete (150200316),
+#          Öykü Eren (150200326),
+#          Bora Boyacıoğlu (150200310)
+
+# Import necessary libraries.
 from typing import List, Tuple
 from _dlib_pybind11 import fhog_object_detector as dlib_pybind11_fhog_object_detector
 from _dlib_pybind11 import shape_predictor as dlib_pybind11_shape_predictor

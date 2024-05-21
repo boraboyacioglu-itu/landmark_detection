@@ -1,3 +1,7 @@
+# Authors: Melisa Mete (150200316),
+#          Öykü Eren (150200326),
+#          Bora Boyacıoğlu (150200310)
+
 """
 Custom class for images data.
 

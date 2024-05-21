@@ -1,3 +1,11 @@
+# Authors: Original Authors *
+#          Melisa Mete (150200316),
+#          Öykü Eren (150200326),
+#          Bora Boyacıoğlu (150200310)
+
+# * Original Authors: []
+
+# Import necessary libraries.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
